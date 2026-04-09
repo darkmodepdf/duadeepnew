@@ -3,6 +3,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from losses import ClassBalancedFocalLoss
 from network import DuaDeepImproved
 from encoders import AntibodyEncoder, AntigenEncoder
@@ -71,7 +72,8 @@ def train_duadeep(data_path="../AbRank_dataset.csv", epochs=10, batch_size=32):
         model.train()
         total_loss = 0
         
-        for ab_batch, ag_batch, labels_batch in train_loader:
+        train_bar = tqdm(train_loader, desc=f"Epoch [{epoch+1}/{epochs}] [Train]")
+        for ab_batch, ag_batch, labels_batch in train_bar:
             labels_batch = labels_batch.to(device)
             optimizer.zero_grad()
             
@@ -82,20 +84,23 @@ def train_duadeep(data_path="../AbRank_dataset.csv", epochs=10, batch_size=32):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+            train_bar.set_postfix(loss=loss.item())
             
-        print(f"Epoch [{epoch+1}/{epochs}] Tracking Loss: {total_loss/len(train_loader):.4f}")
+        print(f"Epoch [{epoch+1}/{epochs}] Final Loss: {total_loss/len(train_loader):.4f}")
         
         # Eval Step for generalizability metrics testing against untouched variants
         model.eval()
         val_loss, all_labels, all_preds = 0, [], []
         
         with torch.no_grad():
-            for ab_batch, ag_batch, labels_batch in val_loader:
+            val_bar = tqdm(val_loader, desc=f"Epoch [{epoch+1}/{epochs}] [Val]")
+            for ab_batch, ag_batch, labels_batch in val_bar:
                 labels_batch = labels_batch.to(device)
                 logits = model(ab_batch, ag_batch)
                 
                 loss = criterion(labels_batch, logits)
                 val_loss += loss.item()
+                val_bar.set_postfix(loss=loss.item())
                 
                 probs = torch.softmax(logits, dim=1)[:, 1]
                 all_labels.extend(labels_batch.cpu().numpy())

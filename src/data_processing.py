@@ -3,6 +3,7 @@ import subprocess
 import pandas as pd
 from collections import Counter
 from sklearn.model_selection import StratifiedKFold
+from tqdm import tqdm
 
 def run_mmseqs_clustering(fasta_path, out_dir, min_seq_id=0.8):
     """
@@ -29,7 +30,25 @@ def setup_balanced_dataset(csv_path="AbRank_dataset.csv", undersample_threshold=
     Assumes standard columns: 'antibody', 'antigen', 'label'
     """
     print(f"Loading {csv_path}...")
-    df = pd.read_csv(csv_path)
+    # The dataset uses TAB as separator and has ^M (CRLF) line endings.
+    df = pd.read_csv(csv_path, sep='\t')
+    
+    # Rename columns to internal standard if they match dataset fields
+    column_mapping = {
+        'Ab_heavy_chain_seq': 'antibody',
+        'Ag_seq': 'antigen',
+        'Aff_op': 'label' 
+    }
+    
+    # Ensure columns exist before renaming
+    actual_columns = {col: column_mapping[col] for col in column_mapping if col in df.columns}
+    df = df.rename(columns=actual_columns)
+    
+    # Convert 'label' to numeric if it's the '=' or other operator strings
+    if 'label' in df.columns and df['label'].dtype == object:
+         # Use Aff_op as a proxy label (1 for '=' implying strong/known binder, 0 otherwise)
+         # This is a heuristic based on the dataset structure observed
+         df['label'] = (df['label'] == '=').astype(int)
     
     # Write unique Antigens to FASTA
     unique_antigens = df['antigen'].unique()
@@ -58,7 +77,8 @@ def setup_balanced_dataset(csv_path="AbRank_dataset.csv", undersample_threshold=
     
     balanced_chunks = []
     # Identify heavily overrepresented clusters (likely our HIV / SARS-CoV-2 strains)
-    for c_id, count in cluster_counts.items():
+    cluster_bar = tqdm(cluster_counts.items(), desc="Balancing Clusters")
+    for c_id, count in cluster_bar:
         subset = df[df['cluster'] == c_id]
         if count > undersample_threshold:
             print(f"Targeted Undersampling: Reducing {c_id} from {count} to {undersample_threshold} samples.")
