@@ -34,10 +34,10 @@ class DuaDeepImproved(nn.Module):
     """
     Combined Architecture mapping heterogeneous encoders through Interaction Core.
     """
-    def __init__(self, ab_model="Exscientia/IgBERT", ag_model="facebook/esm2_t33_650M_UR50D"):
+    def __init__(self, ab_model="Exscientia/IgBERT", ag_model="facebook/esm2_t33_650M_UR50D", ab_freeze=True, ag_freeze=True):
         super(DuaDeepImproved, self).__init__()
-        self.ab_encoder = AntibodyEncoder(model_name=ab_model, freeze=False)
-        self.ag_encoder = AntigenEncoder(model_name=ag_model, freeze=False)
+        self.ab_encoder = AntibodyEncoder(model_name=ab_model, freeze=ab_freeze)
+        self.ag_encoder = AntigenEncoder(model_name=ag_model, freeze=ag_freeze)
         
         # Dimensions are typical outputs for these model sizes. Adjust if needed.
         self.interaction_head = DuaDeepImprovedInteractionHead(ab_dim=768, ag_dim=1280)

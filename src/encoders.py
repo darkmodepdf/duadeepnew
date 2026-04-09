@@ -9,7 +9,8 @@ class AntibodyEncoder(nn.Module):
     def __init__(self, model_name="Exscientia/IgBERT", freeze=True):
         super(AntibodyEncoder, self).__init__()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.encoder = AutoModel.from_pretrained(model_name)
+        # Using add_pooling_layer=False to avoid missing 'pooler' weights in IgBERT
+        self.encoder = AutoModel.from_pretrained(model_name, add_pooling_layer=False)
         
         if freeze:
             for param in self.encoder.parameters():

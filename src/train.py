@@ -3,6 +3,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import pandas as pd
+import argparse
 from tqdm import tqdm
 from losses import ClassBalancedFocalLoss
 from network import DuaDeepImproved
@@ -25,9 +26,13 @@ class BioInteractionDataset(Dataset):
     def __getitem__(self, idx):
         return self.ab_seqs[idx], self.ag_seqs[idx], self.labels[idx]
 
-def train_duadeep(data_path="../AbRank_dataset.csv", epochs=10, batch_size=32):
+def train_duadeep(data_path="AbRank_dataset.csv", epochs=10, batch_size=32, lr=1e-4, weight_decay=1e-2):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Executing Training Pipeline on {device}")
+    
+    # Clear CUDA cache before starting
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     
     # 1. Parse and preprocess ensuring MMseqs2 cluster representation.
     # Targeted undersampling controls the massive HIV/COVID data skew.
@@ -57,12 +62,13 @@ def train_duadeep(data_path="../AbRank_dataset.csv", epochs=10, batch_size=32):
     print("Class Dist. for CB-Focal computation:", samples_per_cls)
     
     # 3. Initialize Architectures and CB-Focal function scaling against any residual class bias
-    model = DuaDeepImproved()
+    # Use frozen encoders to save memory
+    model = DuaDeepImproved(ab_freeze=True, ag_freeze=True)
     model.to(device)
     
     classes_list = torch.tensor(samples_per_cls).float().to(device)
     criterion = ClassBalancedFocalLoss(samples_per_cls=classes_list, num_classes=2, beta=0.9999)
-    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     # 4. Benchmarking/Training Loop mapping AUPRC & ROC-AUC over predictions
     os.makedirs('checkpoints', exist_ok=True)
@@ -125,7 +131,7 @@ def train_duadeep(data_path="../AbRank_dataset.csv", epochs=10, batch_size=32):
     print("Training Completed. Formatting evaluation reports on Best Generalization Module...")
     
     # Reload Best weights to guarantee report maps correctly.
-    best_model = DuaDeepImproved()
+    best_model = DuaDeepImproved(ab_freeze=True, ag_freeze=True)
     best_model.load_state_dict(torch.load(os.path.join('checkpoints', 'best_model.pth')))
     best_model.to(device)
     best_model.eval()
@@ -133,12 +139,28 @@ def train_duadeep(data_path="../AbRank_dataset.csv", epochs=10, batch_size=32):
     final_labels, final_preds = [], []
     with torch.no_grad():
         for ab_batch, ag_batch, labels_batch in val_loader:
+            labels_batch = labels_batch.to(device)
             logits = best_model(ab_batch, ag_batch)
             probs = torch.softmax(logits, dim=1)[:, 1]
-            final_labels.extend(labels_batch.numpy())
+            final_labels.extend(labels_batch.cpu().numpy())
             final_preds.extend(probs.cpu().numpy())
             
     evaluate_and_plot(final_labels, final_preds, out_dir="results")
 
 if __name__ == "__main__":
-    train_duadeep()
+    parser = argparse.ArgumentParser(description="DuaDeep Improved Training Pipeline")
+    parser.add_argument("--data_path", type=str, default="AbRank_dataset.csv", help="Path to CSV dataset")
+    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training and evaluation")
+    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
+    parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay for optimizer")
+    
+    args = parser.parse_args()
+    
+    train_duadeep(
+        data_path=args.data_path,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        weight_decay=args.weight_decay
+    )
