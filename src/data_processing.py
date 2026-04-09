@@ -12,11 +12,13 @@ def run_mmseqs_clustering(fasta_path, out_dir, min_seq_id=0.8):
     os.makedirs(out_dir, exist_ok=True)
     db_path = os.path.join(out_dir, "db")
     cluster_path = os.path.join(out_dir, "clusters")
+    tmp_path = os.path.join(out_dir, "tmp")
+    os.makedirs(tmp_path, exist_ok=True)
     
     # 1. create db
     subprocess.run(["mmseqs", "createdb", fasta_path, db_path], check=True)
     # 2. cluster db
-    subprocess.run(["mmseqs", "cluster", db_path, cluster_path, out_dir, "--min-seq-id", str(min_seq_id)], check=True)
+    subprocess.run(["mmseqs", "cluster", db_path, cluster_path, tmp_path, "--min-seq-id", str(min_seq_id)], check=True)
     # 3. createtsv to extract cluster associations
     tsv_out = os.path.join(out_dir, "clusters.tsv")
     subprocess.run(["mmseqs", "createtsv", db_path, db_path, cluster_path, tsv_out], check=True)
