@@ -49,7 +49,8 @@ results/
 mmseqs_out/
 mmseqs/
 mmseqs-linux-avx2.tar.gz
-AbRank_dataset.csv
+# Large Datasets
+# AbRank_dataset.csv (Managed by Git LFS)
 # IDE / OS
 .vscode/
 .idea/
