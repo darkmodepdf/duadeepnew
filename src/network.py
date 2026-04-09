@@ -3,7 +3,7 @@ import torch.nn as nn
 from encoders import AntibodyEncoder, AntigenEncoder
 
 class DuaDeepImprovedInteractionHead(nn.Module):
-    def __init__(self, ab_dim=768, ag_dim=1280, hidden_dims=[1024, 512, 128], num_classes=2):
+    def __init__(self, ab_dim=1024, ag_dim=1280, hidden_dims=[1024, 512, 128], num_classes=2):
         super(DuaDeepImprovedInteractionHead, self).__init__()
         
         # Cross Attention fusion layers could go here; 
@@ -40,7 +40,7 @@ class DuaDeepImproved(nn.Module):
         self.ag_encoder = AntigenEncoder(model_name=ag_model, freeze=ag_freeze)
         
         # Dimensions are typical outputs for these model sizes. Adjust if needed.
-        self.interaction_head = DuaDeepImprovedInteractionHead(ab_dim=768, ag_dim=1280)
+        self.interaction_head = DuaDeepImprovedInteractionHead(ab_dim=1024, ag_dim=1280)
         
     def forward(self, ab_seqs, ag_seqs):
         ab_emb = self.ab_encoder(ab_seqs)
